@@ -1,136 +1,202 @@
+
+
 import streamlit as st
-from datetime import datetime
-import os
-from PIL import Image
+import requests
+import re
 
-# --- CONFIGURACIÓN Y ESTILOS ---
-st.set_page_config(page_title="SÍ AL MÉRITO - Búnker", page_icon="🚀", layout="wide")
+# ===============================
+# 🔑 CONFIGURACIÓN
+# ===============================
+SUPABASE_URL = "https://uewjwciwyhwlqnuucjkc.supabase.co"
+SUPABASE_KEY = "sb_publishable_er7GMgAwXRRyVf8nHupxAQ_IWtWG2an"
 
-# COLOR VERDE CORPORATIVO: #28a745 (Verde éxito)
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .stButton>button { border-radius: 20px; width: 100%; font-weight: bold; }
-    .titulo-verde { color: #28a745; font-weight: bold; }
-    .noticia-box {
-        background-color: #1E1E1E;
-        padding: 25px;
-        border-radius: 15px;
-        border-left: 8px solid #28a745;
-        color: white;
-        margin-bottom: 25px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+TELEGRAM_TOKEN = "8701147786:AAEUmLT-UMZAlS-GvvizXeeyj0vs2a-z6SA"
+CHAT_ID = "8698188310"
 
-# --- ARCHIVOS DE BASE DE DATOS ---
-ARCHIVO_CHAT = "base_datos_chat.txt"
-ARCHIVO_NOTICIA = "ultima_noticia.txt"
-ARCHIVO_USUARIOS = "usuarios_registrados.txt"
+ADMIN_PASSWORD = "merito2026"
+WHATSAPP_NUMERO = "573146715497"
 
-# --- FUNCIONES DE MEMORIA (Se mantienen igual) ---
-def guardar_usuario(nombre, cedula, correo, celular):
-    with open(ARCHIVO_USUARIOS, "a", encoding="utf-8") as f:
-        f.write(f"{datetime.now()}|{nombre}|{cedula}|{correo}|{celular}\n")
+headers = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json"
+}
 
-def guardar_mensaje(usuario, texto):
-    fecha = datetime.now().strftime("%d/%m %H:%M")
-    with open(ARCHIVO_CHAT, "a", encoding="utf-8") as f:
-        f.write(f"{fecha}|{usuario}|{texto}\n")
+st.set_page_config(page_title="SÍ AL MÉRITO", layout="wide")
 
-def cargar_mensajes():
-    mensajes = []
-    if os.path.exists(ARCHIVO_CHAT):
-        with open(ARCHIVO_CHAT, "r", encoding="utf-8") as f:
-            for linea in f:
-                p = linea.strip().split("|")
-                if len(p) == 3: mensajes.append({"fecha": p[0], "usuario": p[1], "texto": p[2]})
-    return mensajes
+# ===============================
+# 🔔 TELEGRAM
+# ===============================
+def enviar_telegram(mensaje):
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": mensaje})
+    except:
+        pass
 
-def guardar_noticia(titulo, contenido, autor):
-    with open(ARCHIVO_NOTICIA, "w", encoding="utf-8") as f:
-        f.write(f"{titulo}|{contenido}|{autor}")
+# ===============================
+# 🎨 HEADER
+# ===============================
+st.image("logo.jpg", width=120)
+st.title("SÍ AL MÉRITO")
+st.info("Accede a noticias, comunidad y asesoría para concursos públicos")
 
-def cargar_noticia():
-    if os.path.exists(ARCHIVO_NOTICIA):
-        with open(ARCHIVO_NOTICIA, "r", encoding="utf-8") as f:
-            p = f.read().split("|")
-            if len(p) == 3: return {"titulo": p[0], "contenido": p[1], "autor": p[2]}
-    return {"titulo": "PROCESOS DE MÉRITO EN COLOMBIA", "contenido": "Aún no hay noticias publicadas.", "autor": "César Padilla"}
+# ===============================
+# 🔐 SESSION
+# ===============================
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-# --- LÓGICA DE ACCESO ---
-if "autenticado" not in st.session_state:
-    # Mostramos el nombre de la empresa en VERDE en el registro
-    st.markdown("<h1 style='text-align: center;' class='titulo-verde'>SÍ AL MÉRITO</h1>", unsafe_allow_html=True)
-    st.info("Para ingresar al Búnker, por favor registre sus datos.")
-    
-    with st.form("registro"):
-        c1, c2 = st.columns(2)
-        with c1:
-            nom = st.text_input("Nombres y Apellidos")
-            cc = st.text_input("Documento de Identidad")
-        with c2:
-            mail = st.text_input("Correo Electrónico")
-            tel = st.text_input("WhatsApp")
-        
-        if st.form_submit_button("VALIDAR E INGRESAR"):
-            if nom and cc and mail and tel:
-                guardar_usuario(nom, cc, mail, tel)
-                st.session_state.autenticado = nom
+if "admin" not in st.session_state:
+    st.session_state.admin = False
+
+# ===============================
+# VALIDACIONES
+# ===============================
+def validar_email(email):
+    return re.match(r"[^@]+@[^@]+\.[^@]+", email)
+
+def validar_cedula(c):
+    return c.isdigit()
+
+def validar_celular(c):
+    return c.isdigit()
+
+# ===============================
+# 🔐 REGISTRO
+# ===============================
+if st.session_state.user is None:
+
+    st.subheader("Registro de usuarios")
+
+    nombre = st.text_input("Nombre", key="nombre")
+    cedula = st.text_input("Cédula", key="cedula")
+    correo = st.text_input("Correo", key="correo")
+    celular = st.text_input("Celular", key="celular")
+
+    if st.button("Registrarse"):
+
+        if not (nombre and cedula and correo and celular):
+            st.error("Completa todos los campos")
+
+        elif not validar_email(correo):
+            st.error("Correo inválido")
+
+        else:
+            url = f"{SUPABASE_URL}/rest/v1/Usuarios"
+
+            data = {
+                "Nombre": nombre,
+                "Cedula": cedula,
+                "Correo": correo,
+                "Celular": celular
+            }
+
+            r = requests.post(url, json=data, headers=headers)
+
+            if r.status_code == 201:
+                st.session_state.user = nombre
+                st.success("Registro exitoso")
+
+                enviar_telegram(
+                    f"🚨 Nuevo registro\n{nombre}\n{correo}\n{celular}"
+                )
+
                 st.rerun()
-    st.stop()
+            else:
+                st.error(r.text)
 
-# --- INTERFAZ PRINCIPAL (YA LOGUEADO) ---
-with st.sidebar:
-    # AGREGAR EL LOGO (Asegúrate de que el archivo 'logo.jpg' esté en la misma carpeta)
-    if os.path.exists("logo.jpg"):
-        st.image("logo.jpg", width=100)
-    
-    st.header(f"👤 {st.session_state.autenticado}")
-    if st.button("Cerrar Sesión"):
-        del st.session_state.autenticado
+# ===============================
+# 🧠 SISTEMA PRINCIPAL
+# ===============================
+else:
+
+    st.success(f"Bienvenido {st.session_state.user}")
+
+    # SIDEBAR
+    st.sidebar.markdown(f"👤 {st.session_state.user}")
+
+    if st.sidebar.button("Cerrar sesión"):
+        st.session_state.user = None
+        st.session_state.admin = False
         st.rerun()
-    
-    st.divider()
-    st.subheader("🔑 Panel Administrativo")
-    clave = st.text_input("Contraseña de César", type="password")
-    if clave == "Socio2026":
-        t_noticia = st.text_input("Título Noticia")
-        c_noticia = st.text_area("Contenido Noticia")
-        if st.button("🚀 PUBLICAR"):
-            guardar_noticia(t_noticia, c_noticia, st.session_state.autenticado)
-            st.rerun()
 
-# TÍTULO PRINCIPAL EN VERDE
-st.markdown("<h1 class='titulo-verde'>🚀 Búnker de Comunidad - SÍ AL MÉRITO</h1>", unsafe_allow_html=True)
-noticia = cargar_noticia()
+    # ADMIN
+    clave = st.sidebar.text_input("Clave admin", type="password")
 
-# MURO DE NOTICIAS (Letras de título en verde, contenido en blanco)
-st.markdown(f"""
-    <div class="noticia-box">
-        <h2 style="margin:0; color: #28a745;">🔥 {noticia['titulo']}</h2>
-        <p style="font-size: 20px; margin-top: 10px; color: white;">{noticia['contenido']}</p>
-        <hr style="border: 0.5px solid #444;">
-        <small>✍️ Autor: {noticia['autor']}</small>
-    </div>
-    """, unsafe_allow_html=True)
+    if clave == ADMIN_PASSWORD:
+        st.session_state.admin = True
+        st.sidebar.success("Admin activo")
 
-# BOTONES DE REDES
-st.subheader("🔗 Nuestras Redes Oficiales")
-red1, red2, red3, red4 = st.columns(4)
-red1.link_button("📺 YouTube", "https://youtube.com/@sialmerito")
-red2.link_button("📱 TikTok", "https://tiktok.com")
-red3.link_button("💙 Facebook", "https://facebook.com")
-red4.link_button("📚 Material", "https://google.com")
+    # PUBLICAR NOTICIA
+    if st.session_state.admin:
+        st.sidebar.subheader("Publicar noticia")
 
-# CHAT
-st.divider()
-st.header("💬 Foro de Aspirantes")
-for m in cargar_mensajes():
-    with st.chat_message("user"):
-        st.write(f"**{m['usuario']}** - <small>{m['fecha']}</small>", unsafe_allow_html=True)
-        st.write(m['texto'])
+        titulo = st.sidebar.text_input("Título")
+        contenido = st.sidebar.text_area("Contenido")
 
-if prompt := st.chat_input("Escribe tu duda..."):
-    guardar_mensaje(st.session_state.autenticado, prompt)
-    st.rerun()
+        if st.sidebar.button("Publicar"):
+
+            url = f"{SUPABASE_URL}/rest/v1/noticias"
+
+            data = {
+                "titulo": titulo,
+                "contenido": contenido,
+                "autor": st.session_state.user
+            }
+
+            requests.post(url, json=data, headers=headers)
+            st.sidebar.success("Publicada")
+
+    # WHATSAPP
+    link_wp = f"https://wa.me/{WHATSAPP_NUMERO}?text=Hola%20quiero%20información"
+    st.markdown(f"[💬 WhatsApp]({link_wp})")
+
+    st.markdown("---")
+
+    # NOTICIAS
+    st.subheader("Noticias")
+
+    url = f"{SUPABASE_URL}/rest/v1/noticias?select=*"
+    r = requests.get(url, headers=headers)
+
+    if r.status_code == 200:
+        for n in r.json():
+            st.write(f"### {n['titulo']}")
+            st.write(n["contenido"])
+            st.write("---")
+
+    # CHAT
+    st.subheader("Comunidad")
+
+    mensaje = st.text_input("Mensaje", key="mensaje")
+
+    if st.button("Enviar"):
+
+        url = f"{SUPABASE_URL}/rest/v1/mensajes"
+
+        data = {
+            "usuario": st.session_state.user,
+            "mensaje": mensaje
+        }
+
+        requests.post(url, json=data, headers=headers)
+        enviar_telegram(f"{st.session_state.user}: {mensaje}")
+        st.rerun()
+
+    # VER MENSAJES
+    url = f"{SUPABASE_URL}/rest/v1/mensajes?select=*"
+    r = requests.get(url, headers=headers)
+
+    if r.status_code == 200:
+        for m in r.json():
+            st.write(f"{m['usuario']}: {m['mensaje']}")
+
+    # IA
+    st.subheader("Asistente")
+
+    pregunta = st.text_input("Pregunta", key="pregunta")
+
+    if st.button("Consultar"):
+        st.info("Estudia normativa y práctica constante.")
+# version nueva
